@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isOwner(resource) {
+      return request.auth != null && request.auth.uid == resource.data.owner;
+    }
+    
+    function isCollaborator(resource) {
+      return request.auth != null && 
+             request.auth.uid in resource.data.get('collaborators', []);
+    }
+    
+    function hasProjectAccess(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId));
+      return isOwner(project) || 
+             isCollaborator(project) || 
+             (project.data.get('is_public', false) == true);
+    }
+    
+    function hasProjectEditAccess(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId));
+      return isOwner(project) || 
+             (isCollaborator(project) && project.data.get('public_role', 'viewer') == 'editor');
+    }
+    
+    // Projects collection rules
+    match /projects/{projectId} {
+      // Allow read if user is owner, collaborator, or project is public
+      allow read: if request.auth != null && 
+                     (isOwner(resource) || 
+                      isCollaborator(resource) || 
+                      resource.data.get('is_public', false) == true);
+      
+      // Allow create if user is authenticated
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.owner;
+      
+      // Allow update/delete only if user is owner
+      allow update, delete: if request.auth != null && isOwner(resource);
+    }
+    
+    // Files collection rules
+    match /files/{fileId} {
+      // Allow read if user has access to the project
+      allow read: if request.auth != null && 
+                     hasProjectAccess(resource.data.project_id);
+      
+      // Allow create if user has edit access to the project
+      allow create: if request.auth != null && 
+                       hasProjectEditAccess(request.resource.data.project_id) &&
+                       request.auth.uid == request.resource.data.owner;
+      
+      // Allow update if user has edit access to the project
+      allow update: if request.auth != null && 
+                       hasProjectEditAccess(resource.data.project_id);
+      
+      // Allow delete if user is owner or project owner
+      allow delete: if request.auth != null && 
+                       (isOwner(resource) || 
+                        hasProjectEditAccess(resource.data.project_id));
+      
+      // File versions subcollection
+      match /versions/{versionId} {
+        // Allow read if user has access to the file's project
+        allow read: if request.auth != null && 
+                       hasProjectAccess(get(/databases/$(database)/documents/files/$(fileId)).data.project_id);
+        
+        // Allow create if user has edit access to the file's project
+        allow create: if request.auth != null && 
+                         hasProjectEditAccess(get(/databases/$(database)/documents/files/$(fileId)).data.project_id);
+        
+        // Versions are immutable - no update/delete allowed
+        allow update, delete: if false;
+      }
+    }
+    
+    // Users collection (for user profiles)
+    match /users/{userId} {
+      // Users can read and write their own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Workbenches collection rules
+    match /workbenches/{workbenchId} {
+      // Allow read/write only if user is the owner
+      allow read, write: if request.auth != null && 
+                            request.auth.uid == resource.data.owner_id;
+      
+      // Allow create if user is authenticated and setting themselves as owner
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.owner_id;
+    }
+    
+    // Comments collection (for collaborative features)
+    match /comments/{commentId} {
+      // Allow read if user has access to the project
+      allow read: if request.auth != null && 
+                     hasProjectAccess(resource.data.project_id);
+      
+      // Allow create if user has access to the project
+      allow create: if request.auth != null && 
+                       hasProjectAccess(request.resource.data.project_id) &&
+                       request.auth.uid == request.resource.data.author;
+      
+      // Allow update/delete if user is the author
+      allow update, delete: if request.auth != null && 
+                               request.auth.uid == resource.data.author;
+    }
+  }
+}

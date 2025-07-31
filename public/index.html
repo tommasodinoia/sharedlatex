@@ -1,0 +1,117 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TexWaller</title>
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+
+<link rel="busytex" type="text/javascript" id="busytex_worker_js" href="/dist/busytex_worker.js" /> 
+<link rel="busytex" type="text/javascript" id="busytex_pipeline_js" href="/dist/busytex_pipeline.js" />
+<!--
+<link rel="busytex" type="text/javascript" id="busytex_js" href="/dist/busytex.js" />
+<link rel="busytex" type="application/wasm" id="busytex_wasm" href="/dist/busytex.wasm" />
+<link rel="busytex" type="text/javascript" id="texlive_basic" href="/dist/texlive-basic.js" />
+-->
+<link rel="busytex" type="text/javascript" id="busytex_js" href="/dist/alternative/busytex.js" />
+<link rel="busytex" type="application/wasm" id="busytex_wasm" href="/dist/alternative/busytex.wasm" />
+<link rel="busytex" type="text/javascript" id="texlive_basic" href="/dist/alternative/texlive-basic.js" />
+<link rel="busytex" type="text/javascript" id="texlive_fonts_recommended" href="/dist/alternative/texlive-fonts-recommended.js" />
+<link rel="busytex" type="text/javascript" id="texlive_latex_base" href="/dist/alternative/texlive-latex-base.js" />
+<link rel="busytex" type="text/javascript" id="texlive_latex_recommended" href="/dist/alternative/texlive-latex-recommended.js" />
+<link rel="busytex" type="text/javascript" id="texlive_science" href="/dist/alternative/texlive-science.js" />
+<link rel="busytex" type="text/javascript" id="texlive_extra" href="/dist/alternative/texlive-latex-extra.js" />
+
+<link rel="busytex" type="text/javascript" id="texlive_pictures" href="/dist/alternative/full/texlive-pictures.js" />
+
+<!--
+<link rel="busytex" type="text/javascript" id="texlive_ubuntu_science" href="/dist/ubuntu-texlive-science.js" />
+<link rel="busytex" type="text/javascript" id="texlive_ubuntu_recommended" href="/dist/ubuntu-texlive-latex-recommended.js" />
+<link rel="busytex" type="text/javascript" id="texlive_ubuntu_extra" href="/dist/ubuntu-texlive-latex-extra.js" />  
+-->
+
+<link rel="stylesheet" type="text/css" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.21.2/min/vs/editor/editor.main.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons/dist/codicon.css">
+
+<!-- PDF.js scripts with proper initialization - using a different version and CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/dealfonso/pdfjs-viewer@2.0/dist/pdfjs-viewer.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dealfonso/pdfjs-viewer@2.0/dist/pdfjs-viewer.min.css">
+
+</head>
+
+<body>
+<div class="toolbar" style="display: none;">
+<label for="elapsed">Time:</label>
+<span id="elapsed" name="time_elapsed">0.00 sec</span>
+<button onclick="terminate()">Terminate</button>
+<input type="checkbox" id="worker" name="worker" checked>
+<label for="worker">Worker</label>
+<input type="checkbox" id="preload" name="preload" checked>
+<label for="preload">Preload</label>
+<input type="checkbox" id="bibtex" name="bibtex" checked>
+<label for="bibtex">BibTeX</label>
+<select name="verbose" id="verbose">
+    <option value="silent" selected>Verbosity: Almost Silent</option>
+    <option value="info">Verbosity: Quite Talkative</option>
+    <option value="debug">Verbosity: Extremely Chatty</option>
+</select>
+<select id="tex_driver">
+   <!-- <option value="xetex_bibtex8_dvipdfmx">TeX Pipeline: XeTeX + bibtex8 + dvipdfmx</option>-->
+    <option value="pdftex_bibtex8" selected>TeX Pipeline: PdfTeX + bibtex8</option>
+</select>
+<input type="checkbox" id="checked_texlive_auto" name="checked_texlive_auto" checked>
+<label for="checked_texlive_auto">auto selection</label>
+<input type="checkbox" id="checked_texlive_ubuntu_recommended" name="checked_texlive_ubuntu_recommended">
+<label for="checked_texlive_ubuntu_recommended">texlive-latex-recommended</label>
+<input type="checkbox" id="checked_texlive_ubuntu_extra" name="checked_texlive_ubuntu_extra">
+<label for="checked_texlive_ubuntu_extra">texlive-latex-extra</label>
+<input type="checkbox" id="checked_texlive_ubuntu_science" name="checked_texlive_ubuntu_science">
+<label for="checked_texlive_ubuntu_science">texlive-science</label>
+</div>
+<div class="workspace">
+    <div class="hover-trigger"></div>
+    <div id="file-explorer" class="file-explorer">
+        <div class="file-explorer-header">
+            <span class="codicon codicon-files"></span>
+            EXPLORER
+        </div>
+        <div id="file-tree" class="file-tree"></div>
+    </div>
+    <div class="container">
+        <div id="editor-container">
+            <div id="tex-editor"></div>
+            <div id="bib-editor"></div>
+            <div id="supportpane">
+                <div id="tabs">
+                  <div class="tab active" data-tab="errors">Errors</div>
+                  <div class="tab" data-tab="warnings">Warnings</div>
+                  <div class="tab" data-tab="typesetting">Typesetting</div> <!-- Nuovo tab -->
+                  <div class="tab" data-tab="info">Full Log</div>
+                  <div class="supportpane-controls">
+                    <button id="minimize-supportpane" title="Minimize">_</button>
+                    <button id="close-supportpane" title="Close">X</button>
+                  </div>
+                </div>
+                <div id="errors" class="tab-content active"></div>
+                <div id="warnings" class="tab-content"></div>
+                <div id="info" class="tab-content"></div>
+                <div id="typesetting" class="tab-content"></div> <!-- Contenitore per il nuovo tab -->
+                <div id="resize-handle"></div> <!-- Handle per il ridimensionamento -->
+              </div>
+        </div>
+        <div id="preview-container">
+          <iframe id="pdfViewer" src="./web/viewer.html" title="PDF Preview"></iframe>
+          <div id="spinner">
+            <img src="spinner.gif" alt="Loading...">
+          </div>
+        </div>
+    </div>
+    <div><button class="compile" id="compile-button">Compile</button></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.21.2/min/vs/loader.min.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Launch Chrome against localhost",
+            // URL relative to the server root (which is public/)
+            "url": "http://localhost:8080/index.html",
+            // webRoot matches the directory being served
+            "webRoot": "${workspaceFolder}/public",
+            "preLaunchTask": "Start Local Server"
+        }
+        // ... potentially other configurations ...
+    ]
+}
