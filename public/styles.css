@@ -130,7 +130,7 @@ button:hover {
 
 #bib-editor {
   height: 35%;
-  display: none;
+  display: block;
 }
 
 /* Preview container and iframe */

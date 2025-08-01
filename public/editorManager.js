@@ -48,7 +48,7 @@ export function initializeEditor() {
                 wordWrap: 'on',
                 automaticLayout: true
             });
-
+            
             bibEditor = monaco.editor.create(document.getElementById('bib-editor'), {
                 value: bibContent || defaultBibContent,
                 language: 'bibtex',
@@ -56,7 +56,7 @@ export function initializeEditor() {
                 wordWrap: 'on',
                 automaticLayout: true
             });
-
+            
             // Set current file after editors are initialized
             currentFile = mainTexFile;
 

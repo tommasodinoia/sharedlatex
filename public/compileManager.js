@@ -19,8 +19,6 @@ const texmf_local = ["./texmf", "./.texmf"];
 let worker = null;
 
 
-
-
 // Export the necessary functions
 export async function onclick_compile_latex_() {
   console.log('[onclick_compile_latex_] Compile button clicked');
@@ -59,6 +57,7 @@ export async function onclick_compile_latex_() {
 
   // Reset decorations and clear log-related tabs
   resetFromLogs([texEditor, bibEditor]);
+  document.getElementById('Logs').value = ''; // Clear the Logs textarea
 
   // Start compilation
   compileButton.classList.add('compiling');
@@ -69,11 +68,11 @@ export async function onclick_compile_latex_() {
   }
 
   //const use_worker = workerCheckbox.checked;
-  const use_preload = preloadCheckbox.checked;
-  const use_verbose = verboseSelect.value;
-  const use_driver = driverSelect.value;
-  const use_bibtex = bibtexCheckbox.checked;
-  const use_auto = autoCheckbox.checked;
+  const use_preload = true;
+  const use_verbose = 'silent';
+  const use_driver = "pdftex_bibtex8";
+  const use_bibtex = true;
+  const use_auto = false;
 
   
   let data_packages_js = null;
@@ -107,15 +106,6 @@ export async function onclick_compile_latex_() {
   
 
   tic = performance.now();
-  //console.warn(tic);
-  /*
-  const tex = texEditor.getValue();
-  const bib = bibEditor.getValue();
-  const files = [
-    { path: "example.tex", contents: tex },
-    { path: "example.bib", contents: bib },
-  ];
-  */
 
   //worker.postMessage({ action: 'TEST_ADD_CIAO' });
 
@@ -133,7 +123,7 @@ export async function onclick_compile_latex_() {
 
   //worker.postMessage({ action: 'FS_LIST', listPath: '/home/web_user' });
 
-  worker.onmessage = async ({ data: { pdf, log, exit_code, logs, print, synctex, contents, exception } }) => {
+  worker.onmessage = async ({ data: { pdf, log, exit_code, logs, print, synctex, exception, fs_contents, texmf_log, missfont_log } }) => {
     // Reset the PDF sync object
     setPdfSyncObject(null);
 
@@ -204,9 +194,51 @@ export async function onclick_compile_latex_() {
       console.log(print);
     }
 
-    if (log) {
-      // Use manageCompilationLog to handle the LaTeX log
-      //TODO:
+    if (logs) {
+      // Serializza l'oggetto logs in flat text
+      let logsText = '';
+      
+      if (Array.isArray(logs)) {
+        logs.forEach((logEntry, index) => {
+          logsText += `=== LOG ENTRY ${index + 1} ===\n`;
+          if (logEntry.cmd) {
+            logsText += `COMMAND: ${logEntry.cmd}\n`;
+          }
+          if (logEntry.stdout) {
+            logsText += `STDOUT:\n${logEntry.stdout}\n\n`;
+          }
+          if (logEntry.stderr) {
+            logsText += `STDERR:\n${logEntry.stderr}\n\n`;
+          }
+          if (logEntry.log) {
+            logsText += `LOG:\n${logEntry.log}\n\n`;
+          }
+          logsText += '='.repeat(50) + '\n\n';
+        });
+      } else if (typeof logs === 'object') {
+        // Se logs è un singolo oggetto
+        if (logs.cmd) {
+          logsText += `COMMAND: ${logs.cmd}\n`;
+        }
+        if (logs.stdout) {
+          logsText += `STDOUT:\n${logs.stdout}\n\n`;
+        }
+        if (logs.stderr) {
+          logsText += `STDERR:\n${logs.stderr}\n\n`;
+        }
+        if (logs.log) {
+          logsText += `LOG:\n${logs.log}\n\n`;
+        }
+      } else {
+        // Fallback per altri tipi
+        logsText = logs.toString();
+      }
+      
+      // Mostra il testo serializzato nella textarea
+      const logsElement = document.getElementById('Logs');
+      if (logsElement) {
+        logsElement.value = logsText;
+      }
     }
 
     if (typeof exit_code === "number" && Array.isArray(logs) && exit_code !== 0) {
@@ -218,9 +250,58 @@ export async function onclick_compile_latex_() {
       manageCompilationLog(log, { texEditor, bibEditor });
     }
 
-    if (contents) {
-      console.warn("[Busytex Worker] File system contents:", contents);
-      // Handle the file system contents here
+    if (fs_contents) {
+      console.warn("[Busytex Worker] File system contents:", fs_contents);
+      console.log("[Busytex Worker] Type of fs_contents:", typeof fs_contents);
+      
+      try {
+        // Handle fs_contents based on its type
+        let fs_json;
+        if (typeof fs_contents === 'string') {
+          // If it's a string, parse it as JSON
+          fs_json = JSON.parse(fs_contents);
+        } else if (typeof fs_contents === 'object') {
+          // If it's already an object, use it directly
+          fs_json = fs_contents;
+        } else {
+          throw new Error(`Unexpected fs_contents type: ${typeof fs_contents}`);
+        }
+        
+        //console.log("[Busytex Worker] fs_contents as object:", fs_json);
+        
+        // Extract all "name" field values and create flat_fs_content
+        const flat_fs_content = [];
+        
+        function extractNames(obj) {
+          if (Array.isArray(obj)) {
+            obj.forEach(item => extractNames(item));
+          } else if (obj && typeof obj === 'object') {
+            if (obj.hasOwnProperty('name')) {
+              flat_fs_content.push(obj.name);
+            }
+            Object.values(obj).forEach(value => extractNames(value));
+          }
+        }
+        
+        extractNames(fs_json);
+        
+        //console.log("[Busytex Worker] Extracted names (flat_fs_content):", flat_fs_content);
+        console.log("[Busytex Worker] Total files found:", flat_fs_content.length);
+        
+        // Display in textarea (you can also display flat_fs_content if preferred)
+        const fsTextarea = document.getElementById('wasm_fs');
+        fsTextarea.value = flat_fs_content.join('\n');
+        
+      } catch (error) {
+        console.error("[Busytex Worker] Error processing fs_contents:", error);
+        // Fallback to original behavior - stringify the object if it's not a string
+        const fsTextarea = document.getElementById('wasm_fs');
+        if (typeof fs_contents === 'object') {
+          fsTextarea.value = JSON.stringify(fs_contents, null, 2);
+        } else {
+          fsTextarea.value = fs_contents;
+        }
+      }
     }
     if (exception) {
       console.error("[Busytex Worker] Exception:", exception);

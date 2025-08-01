@@ -696,7 +696,7 @@ class BusytexPipeline
 
         // Funzione per leggere ricorsivamente il contenuto di una directory
         // DA CANCELLARE
-        /*
+        
         const readDirectoryRecursive = (FS, PATH, path) => {
             const entries = FS.readdir(path).filter(entry => entry !== '.' && entry !== '..');
             let result = [];
@@ -715,14 +715,14 @@ class BusytexPipeline
 
             return result;
         };
-        */
+        
 
         // Legge il contenuto ricorsivo della directory /home/web_user
         // DA CANCELLARE
-        /*
-        const directoryContents = readDirectoryRecursive(FS, PATH, '/home/web_user');
-        console.log('Contenuto ricorsivo della directory /home/web_user:', directoryContents);
-        */
+    
+        const directoryContents = readDirectoryRecursive(FS, PATH, '/texlive');
+        //console.log('Contenuto ricorsivo della directory /home/web_user:', directoryContents);
+        
         // Restituisce il risultato della compilazione insieme al contenuto della directory
         const pdf = exit_code == 0 ? this.read_all_bytes(FS, pdf_path) : null;
         
@@ -736,9 +736,9 @@ class BusytexPipeline
 
         /*
         return { pdf: pdf, log: logcat, exit_code: exit_code, logs: logs, directoryContents: directoryContents };
-        */
-                
-        return { pdf: pdf, synctex: synctex, log: logcat, exit_code: exit_code, logs: logs};
+        */      
+
+        return { pdf: pdf, synctex: synctex, log: logcat, exit_code: exit_code, logs: logs, fs_contents: directoryContents, texmf_log: this.read_all_text(FS, this.texmflog), missfont_log: this.read_all_text(FS, this.missfontlog) };
 
     }
 }
